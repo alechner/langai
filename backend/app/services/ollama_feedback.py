@@ -20,8 +20,11 @@ async def generate_feedback(
         "Return concise feedback in 3 parts: what was good, what to improve, and one next attempt tip."
     )
     payload = {"model": settings.ollama_model, "prompt": prompt, "stream": False}
-    async with httpx.AsyncClient(timeout=45) as client:
-        response = await client.post(f"{settings.ollama_url}/api/generate", json=payload)
+    try:
+        async with httpx.AsyncClient(timeout=45) as client:
+            response = await client.post(f"{settings.ollama_url}/api/generate", json=payload)
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Could not connect to Ollama at {settings.ollama_url}") from exc
     if response.status_code != 200:
         raise RuntimeError(f"Ollama request failed with {response.status_code}: {response.text}")
     data = response.json()
