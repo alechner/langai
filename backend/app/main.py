@@ -45,6 +45,17 @@ def ensure_users_admin_column():
         connection.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE"))
 
 
+def ensure_speech_attempts_audio_column():
+    inspector = inspect(engine)
+    if "speech_attempts" not in inspector.get_table_names():
+        return
+    attempt_columns = {column["name"] for column in inspector.get_columns("speech_attempts")}
+    if "audio_base64" in attempt_columns:
+        return
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE speech_attempts ADD COLUMN audio_base64 TEXT DEFAULT NULL"))
+
+
 def ensure_at_least_one_admin(db: Session):
     admin_count = db.query(User).filter(User.is_admin.is_(True)).count()
     if admin_count > 0:
@@ -59,6 +70,7 @@ def ensure_at_least_one_admin(db: Session):
 def startup():
     Base.metadata.create_all(bind=engine)
     ensure_users_admin_column()
+    ensure_speech_attempts_audio_column()
     db = SessionLocal()
     try:
         seed_languages(db)
