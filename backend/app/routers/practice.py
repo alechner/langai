@@ -1,4 +1,5 @@
 import tempfile
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -13,6 +14,7 @@ from ..services.pronunciation import evaluate_pronunciation
 from ..services.stt import transcribe_file
 
 router = APIRouter(prefix="/practice", tags=["practice"])
+logger = logging.getLogger(__name__)
 
 
 def _assert_supported_language(db: Session, code: str):
@@ -61,6 +63,7 @@ async def evaluate_text(
     current_user: User = Depends(get_current_user),
 ):
     _assert_supported_language(db, payload.language_code)
+    logger.info("Text evaluation started for user_id=%s language=%s", current_user.id, payload.language_code)
     return await _save_attempt(
         db,
         current_user,
@@ -79,6 +82,7 @@ async def evaluate_audio(
     current_user: User = Depends(get_current_user),
 ):
     _assert_supported_language(db, language_code)
+    logger.info("Audio evaluation started for user_id=%s language=%s", current_user.id, language_code)
     suffix = Path(audio.filename or "audio.webm").suffix or ".webm"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
         temp_path = Path(temp_file.name)

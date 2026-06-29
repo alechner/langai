@@ -18,6 +18,55 @@ body {
   padding: 1.5rem;
 }
 
+.app-shell {
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: #fff;
+  border-bottom: 1px solid #dbe2f4;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.sidebar {
+  height: fit-content;
+}
+
+.menu-button {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 0.6rem;
+}
+
+.menu-button.active {
+  background: #1e3ece;
+}
+
+.content {
+  min-width: 0;
+}
+
 .card {
   background: #ffffff;
   border-radius: 12px;
@@ -53,7 +102,6 @@ button {
 
 button.ghost {
   background: #7583a7;
-  margin-bottom: 0.8rem;
 }
 
 .row {
@@ -64,4 +112,38 @@ button.ghost {
 .error {
   color: #c21807;
   font-weight: 600;
+}
+
+.status {
+  color: #1e3ece;
+  font-weight: 600;
+}
+
+.logs-list {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.log-entry {
+  margin: 0 0 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  border: 1px solid #dbe2f4;
+  text-align: left;
+  padding: 0.55rem;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
 }

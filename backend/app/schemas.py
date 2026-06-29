@@ -13,9 +13,15 @@ class UserRead(BaseModel):
     id: int
     email: EmailStr
     full_name: str
+    is_admin: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserAdminUpdate(BaseModel):
+    full_name: str | None = Field(default=None, min_length=2, max_length=255)
+    is_admin: bool | None = None
 
 
 class Token(BaseModel):
@@ -47,3 +53,10 @@ class ProgressSummary(BaseModel):
     total_attempts: int
     avg_similarity_score: float
     avg_pronunciation_score: float
+
+
+class AppLogEntry(BaseModel):
+    timestamp: datetime
+    level: str
+    logger: str
+    message: str

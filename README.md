@@ -17,8 +17,12 @@ Local-first language learning web app for family use, with:
 ## Run with Docker Compose
 
 ```bash
-docker compose up --build -d
+./scripts/up.sh
 ```
+
+O script verifica se ja existe Ollama em `localhost:11434`:
+- Se existir, sobe `db + backend + frontend` e aponta o backend para `http://host.docker.internal:11434`.
+- Se nao existir, sobe tambem o servico `ollama` deste compose.
 
 Pull a default model in Ollama:
 
@@ -29,6 +33,10 @@ docker compose exec ollama ollama pull llama3.2:3b
 Access:
 - Frontend: http://localhost:5173
 - Backend API docs: http://localhost:8000/docs
+
+Admin:
+- O primeiro usuário registrado recebe perfil de administrador automaticamente.
+- Administrador vê no frontend os menus de **Logs** e **Usuários**.
 
 ## Core API endpoints
 

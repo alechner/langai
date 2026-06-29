@@ -33,7 +33,8 @@ services:
       FRONTEND_ORIGIN: http://localhost:5173
     depends_on:
       - db
-      - ollama
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8000:8000"
 
