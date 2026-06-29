@@ -49,6 +49,22 @@ class PracticeEvaluateResponse(BaseModel):
     feedback: str
 
 
+class PreviewAudioRequest(BaseModel):
+    audio_base64: str = Field(..., min_length=1)
+
+
+class SpeechAttemptRead(BaseModel):
+    id: int
+    target_sentence: str
+    transcript: str
+    similarity_score: float
+    pronunciation_score: float
+    feedback: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class ProgressSummary(BaseModel):
     total_attempts: int
     avg_similarity_score: float

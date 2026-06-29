@@ -104,6 +104,11 @@ button.ghost {
   background: #7583a7;
 }
 
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .row {
   display: flex;
   gap: 0.7rem;
@@ -128,6 +133,10 @@ button.ghost {
   margin: 0 0 0.5rem;
   white-space: pre-wrap;
   word-break: break-word;
+  font-size: 0.85rem;
+  background: #f5f5f5;
+  padding: 0.5rem;
+  border-radius: 4px;
 }
 
 table {
@@ -140,6 +149,38 @@ td {
   border: 1px solid #dbe2f4;
   text-align: left;
   padding: 0.55rem;
+}
+
+th {
+  background: #f0f4ff;
+  font-weight: 600;
+}
+
+.attempts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.attempt-card {
+  border: 1px solid #dbe2f4;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #fafbfd;
+}
+
+.attempt-card p {
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+}
+
+.attempt-card strong {
+  color: #152238;
+}
+
+audio {
+  width: 100%;
+  margin: 0.5rem 0;
 }
 
 @media (max-width: 900px) {

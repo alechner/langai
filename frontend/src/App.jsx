@@ -36,6 +36,19 @@ async function parseApiError(response) {
   throw new Error(detail);
 }
 
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result;
+      const base64 = dataUrl.split(",")[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [email, setEmail] = useState("");
@@ -55,6 +68,9 @@ export default function App() {
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [isSubmittingText, setIsSubmittingText] = useState(false);
   const [isSubmittingAudio, setIsSubmittingAudio] = useState(false);
+  const [recordingPhase, setRecordingPhase] = useState("idle");
+  const [recordedAudioBase64, setRecordedAudioBase64] = useState("");
+  const [recordedAudioBlob, setRecordedAudioBlob] = useState(null);
 
   const [logs, setLogs] = useState([]);
   const [logsLoaded, setLogsLoaded] = useState(false);
@@ -62,9 +78,11 @@ export default function App() {
   const [users, setUsers] = useState([]);
   const [usersLoaded, setUsersLoaded] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [attempts, setAttempts] = useState([]);
+  const [attemptsLoaded, setAttemptsLoaded] = useState(false);
+  const [isLoadingAttempts, setIsLoadingAttempts] = useState(false);
 
   const operationIdRef = useRef(0);
-  const audioOperationIdRef = useRef(0);
 
   const authHeaders = useMemo(
     () => ({
@@ -158,6 +176,27 @@ export default function App() {
     loadUsers();
   }, [activeView, authHeaders, isAdmin, token, usersLoaded]);
 
+  useEffect(() => {
+    if (activeView !== "history" || attemptsLoaded || !token) return;
+
+    async function loadAttempts() {
+      try {
+        setIsLoadingAttempts(true);
+        setError("");
+        const response = await fetch(`${API_BASE}/practice/attempts`, { headers: authHeaders });
+        if (!response.ok) await parseApiError(response);
+        setAttempts(await response.json());
+        setAttemptsLoaded(true);
+      } catch (err) {
+        setError(getErrorMessage(err));
+      } finally {
+        setIsLoadingAttempts(false);
+      }
+    }
+
+    loadAttempts();
+  }, [activeView, authHeaders, token, attemptsLoaded]);
+
   async function register(event) {
     event.preventDefault();
     try {
@@ -232,25 +271,40 @@ export default function App() {
     }
   }
 
-  async function evaluateAudio(chunks, operationId) {
-    if (!chunks.length) return;
-    const blob = new Blob(chunks, { type: "audio/webm" });
-    const formData = new FormData();
-    formData.append("language_code", languageCode);
-    formData.append("target_sentence", targetSentence);
-    formData.append("audio", blob, "attempt.webm");
+  async function evaluateAudio() {
+    if (!recordedAudioBlob || !recordedAudioBase64) return;
+    const operationId = ++operationIdRef.current;
 
-    const response = await fetch(`${API_BASE}/practice/evaluate-audio`, {
-      method: "POST",
-      headers: authHeaders,
-      body: formData
-    });
-    if (!response.ok) await parseApiError(response);
-    const data = await response.json();
-    if (operationId !== operationIdRef.current) return;
-    setSpokenText(data.transcript);
-    setResult(data);
-    setStatusMessage("");
+    try {
+      setError("");
+      setStatusMessage("Analisando áudio... aguarde.");
+      setIsSubmittingAudio(true);
+
+      const formData = new FormData();
+      formData.append("language_code", languageCode);
+      formData.append("target_sentence", targetSentence);
+      formData.append("audio", recordedAudioBlob, "attempt.webm");
+      formData.append("audio_base64", recordedAudioBase64);
+
+      const response = await fetch(`${API_BASE}/practice/evaluate-audio`, {
+        method: "POST",
+        headers: authHeaders,
+        body: formData
+      });
+      if (!response.ok) await parseApiError(response);
+      const data = await response.json();
+      if (operationId !== operationIdRef.current) return;
+      setSpokenText(data.transcript);
+      setResult(data);
+      setRecordingPhase("result");
+      setStatusMessage("");
+      setAttemptsLoaded(false);
+    } catch (err) {
+      setError(getErrorMessage(err));
+      setStatusMessage("");
+    } finally {
+      setIsSubmittingAudio(false);
+    }
   }
 
   async function startRecording() {
@@ -264,29 +318,39 @@ export default function App() {
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
         try {
-          await evaluateAudio(chunks, audioOperationIdRef.current);
+          const blob = new Blob(chunks, { type: "audio/webm" });
+          const base64 = await blobToBase64(blob);
+          setRecordedAudioBlob(blob);
+          setRecordedAudioBase64(base64);
+          setRecordingPhase("preview");
         } catch (err) {
           setError(getErrorMessage(err));
-          setStatusMessage("");
-        } finally {
-          setIsSubmittingAudio(false);
         }
       };
       recorder.start();
       setMediaRecorder(recorder);
       setRecording(true);
+      setRecordingPhase("recording");
     } catch (err) {
       setError(getErrorMessage(err));
     }
   }
 
-  function stopRecordingAndEvaluate() {
-    if (!mediaRecorder || isSubmittingAudio) return;
-    audioOperationIdRef.current = ++operationIdRef.current;
+  function stopRecording() {
+    if (!mediaRecorder) return;
     mediaRecorder.stop();
     setRecording(false);
-    setIsSubmittingAudio(true);
-    setStatusMessage("Analisando áudio... aguarde.");
+  }
+
+  function discardRecording() {
+    setRecordingPhase("idle");
+    setRecordedAudioBase64("");
+    setRecordedAudioBlob(null);
+  }
+
+  function restartRecording() {
+    discardRecording();
+    startRecording();
   }
 
   async function toggleAdmin(targetUser) {
@@ -360,6 +424,12 @@ export default function App() {
           >
             Pronúncia
           </button>
+          <button
+            className={activeView === "history" ? "menu-button active" : "menu-button"}
+            onClick={() => setActiveView("history")}
+          >
+            Histórico
+          </button>
           {isAdmin && (
             <button
               className={activeView === "logs" ? "menu-button active" : "menu-button"}
@@ -396,27 +466,85 @@ export default function App() {
                 <label>Target sentence</label>
                 <textarea value={targetSentence} onChange={(e) => setTargetSentence(e.target.value)} rows={2} />
 
-                <label>Spoken text (manual mode)</label>
-                <textarea value={spokenText} onChange={(e) => setSpokenText(e.target.value)} rows={2} />
+                {recordingPhase === "idle" && (
+                  <>
+                    <label>Spoken text (manual mode)</label>
+                    <textarea value={spokenText} onChange={(e) => setSpokenText(e.target.value)} rows={2} />
 
-                <div className="row">
-                  <button type="submit" disabled={isBusy}>
-                    Evaluate text
-                  </button>
-                  {!recording ? (
-                    <button type="button" onClick={startRecording} disabled={isBusy}>
-                      Record audio
+                    <div className="row">
+                      <button type="submit" disabled={isBusy}>
+                        Evaluate text
+                      </button>
+                      <button type="button" onClick={startRecording} disabled={isBusy}>
+                        Record audio
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {recordingPhase === "recording" && (
+                  <div className="row">
+                    <p className="status" style={{ margin: "0.8rem 0" }}>
+                      🔴 Gravando...
+                    </p>
+                    <button type="button" onClick={stopRecording}>
+                      Parar gravação
                     </button>
-                  ) : (
-                    <button type="button" onClick={stopRecordingAndEvaluate} disabled={isSubmittingAudio}>
-                      Stop + evaluate audio
-                    </button>
-                  )}
-                </div>
+                  </div>
+                )}
+
                 {statusMessage && <p className="status">{statusMessage}</p>}
               </form>
 
-              {result && (
+              {recordingPhase === "preview" && recordedAudioBase64 && (
+                <section className="card">
+                  <h3>Pré-visualização do áudio</h3>
+                  <audio controls style={{ width: "100%", marginBottom: "0.8rem" }}>
+                    <source src={`data:audio/webm;base64,${recordedAudioBase64}`} type="audio/webm" />
+                    Seu navegador não suporta o elemento de áudio.
+                  </audio>
+                  <div className="row">
+                    <button type="button" onClick={restartRecording}>
+                      Regravar
+                    </button>
+                    <button type="button" onClick={evaluateAudio} disabled={isBusy}>
+                      Enviar para análise
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {result && recordingPhase === "result" && (
+                <section className="card">
+                  <h2>Feedback</h2>
+                  <p>
+                    <strong>Transcript:</strong> {result.transcript}
+                  </p>
+                  <p>
+                    <strong>Similarity:</strong> {result.similarity_score}
+                  </p>
+                  <p>
+                    <strong>Pronunciation:</strong> {result.pronunciation_score}
+                  </p>
+                  <p>
+                    <strong>Coach feedback:</strong> {result.feedback}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecordingPhase("idle");
+                      setResult(null);
+                      setSpokenText("");
+                      setRecordedAudioBase64("");
+                      setRecordedAudioBlob(null);
+                    }}
+                  >
+                    Nova tentativa
+                  </button>
+                </section>
+              )}
+
+              {result && recordingPhase !== "result" && (
                 <section className="card">
                   <h2>Feedback</h2>
                   <p>
@@ -434,6 +562,41 @@ export default function App() {
                 </section>
               )}
             </>
+          )}
+
+          {activeView === "history" && (
+            <section className="card">
+              <h2>Histórico de tentativas</h2>
+              {isLoadingAttempts ? (
+                <p>Carregando histórico...</p>
+              ) : (
+                <div className="attempts-list">
+                  {attempts.map((attempt) => (
+                    <div key={attempt.id} className="attempt-card">
+                      <p>
+                        <strong>Data:</strong> {new Date(attempt.created_at).toLocaleString()}
+                      </p>
+                      <p>
+                        <strong>Frase:</strong> {attempt.target_sentence}
+                      </p>
+                      <p>
+                        <strong>Transcrição:</strong> {attempt.transcript}
+                      </p>
+                      <p>
+                        <strong>Similaridade:</strong> {attempt.similarity_score}
+                      </p>
+                      <p>
+                        <strong>Pronúncia:</strong> {attempt.pronunciation_score}
+                      </p>
+                      <p>
+                        <strong>Feedback:</strong> {attempt.feedback}
+                      </p>
+                    </div>
+                  ))}
+                  {!attempts.length && <p>Nenhuma tentativa registrada.</p>}
+                </div>
+              )}
+            </section>
           )}
 
           {activeView === "logs" && isAdmin && (

@@ -37,6 +37,7 @@ class SpeechAttempt(Base):
     similarity_score: Mapped[float] = mapped_column(Float, nullable=False)
     pronunciation_score: Mapped[float] = mapped_column(Float, nullable=False)
     feedback: Mapped[str] = mapped_column(Text, nullable=False)
+    audio_base64: Mapped[str | None] = mapped_column(Text, default=None, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="attempts")
